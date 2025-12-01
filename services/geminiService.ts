@@ -1,12 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TranscriptionResult } from "../types";
 
-// The define in vite.config.ts replaces process.env.API_KEY with the actual string
-const apiKey = process.env.API_KEY || '';
+// Safe access to the injected API key
+// Vite replaces process.env.API_KEY with the literal string value during build.
+const apiKey = process.env.API_KEY;
 
-// Initialize only if key exists to prevent immediate errors in environments without keys
+// Initialize only if key exists to prevent immediate errors
 let ai: GoogleGenAI | null = null;
-if (apiKey && apiKey.length > 0 && !apiKey.includes("API_KEY")) {
+if (apiKey && typeof apiKey === 'string' && apiKey.length > 0 && !apiKey.includes("API_KEY")) {
   try {
     ai = new GoogleGenAI({ apiKey });
   } catch (e) {
@@ -96,7 +97,7 @@ export const GeminiService = {
         return new Promise(resolve => setTimeout(() => resolve({
             original: "So, in this video, we are going to learn how to build a Telegram Bot using Node.js. It's actually quite simple once you get the hang of the API.",
             hindi: "तो, इस वीडियो में, हम सीखेंगे कि Node.js का उपयोग करके टेलीग्राम बॉट कैसे बनाया जाए। एक बार जब आप एपीआई को समझ लेते हैं तो यह वास्तव में काफी सरल होता है।",
-            urdu: "تو، اس ویڈیو میں، ہم سیکھنے جا رہے ہیں کہ Node.js کا استعمال کرتے ہوئے ٹیلیگرام بوٹ کیسے بنایا جائے۔ ایک بار جب آپ API کو سمجھ لیتے ہیں تو یہ اصل میں بہت آسان ہے۔",
+            urdu: "تو، اس ویڈیو में، हम سیکھنے جا رہے ہیں کہ Node.js کا استعمال کرتے ہوئے ٹیلیگرام بوٹ کیسے بنایا جائے۔ ایک بار جب آپ API کو سمجھ لیتے ہیں تو یہ اصل میں بہت آسان ہے۔",
             telugu: "కాబట్టి, ఈ వీడియోలో, మనం Node.js ఉపయోగించి టెలిగ్రామ్ బాట్‌ను ఎలా నిర్మించాలో నేర్చుకోబోతున్నాం. మీరు APIని అర్థం చేసుకున్న తర్వాత ఇది చాలా సులభం."
         }), 1500));
      }
@@ -115,7 +116,7 @@ export const GeminiService = {
      return {
          original: "This is a placeholder transcription for the video content. The AI analyzes the audio stream to generate text.",
          hindi: "यह वीडियो सामग्री के लिए एक प्लेसहोल्डर प्रतिलेखन है। AI टेक्स्ट उत्पन्न करने के लिए ऑडियो स्ट्रीम का विश्लेषण करता है।",
-         urdu: "یہ ویڈیو مواد کے لیے ایک پلیس ہولڈر ٹرانسکرپشن ہے۔ AI متن بنانے के لیے آڈیو سٹریم کا تجزیہ کرتا ہے۔",
+         urdu: "یہ ویڈیو مواد کے لیے ایک پلیس ہولڈر ٹرانسکرپشن ہے۔ AI متن بنانے کے لیے آڈیو سٹریم کا تجزیہ کرتا ہے۔",
          telugu: "ఇది వీడియో కంటెంట్ కోసం ప్లేస్‌హోల్డర్ ట్రాన్స్‌క్రిప్షన్. వచనాన్ని రూపొందించడానికి AI ఆడియో స్ట్రీమ్‌ను విశ్లేషిస్తుంది."
      };
   },
