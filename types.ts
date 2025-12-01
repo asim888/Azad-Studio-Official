@@ -37,15 +37,6 @@ export interface TelegramWebApp {
     offClick: (callback: () => void) => void;
     show: () => void;
     hide: () => void;
-  };
-  MainButton: {
-    text: string;
-    color: string;
-    textColor: string;
-    isVisible: boolean;
-    isActive: boolean;
-    show: () => void;
-    hide: () => void;
     enable: () => void;
     disable: () => void;
     onClick: (callback: () => void) => void;
@@ -73,6 +64,14 @@ declare global {
     Telegram: {
       WebApp: TelegramWebApp;
     };
+  }
+  
+  // Augment NodeJS namespace to include API_KEY in ProcessEnv
+  // This avoids redeclaring 'process' which causes conflicts with @types/node
+  namespace NodeJS {
+    interface ProcessEnv {
+      API_KEY: string;
+    }
   }
 }
 
