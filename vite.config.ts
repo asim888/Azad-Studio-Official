@@ -7,8 +7,11 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // This allows your existing code using process.env.API_KEY to work
-      'process.env.API_KEY': JSON.stringify(env.API_KEY)
+      // Replaces specific env access
+      'process.env.API_KEY': JSON.stringify(env.API_KEY),
+      // Polyfill global process to prevent crashes in libraries that assume Node.js env
+      'process.env': {},
+      'process': { env: {} }
     }
   };
 });

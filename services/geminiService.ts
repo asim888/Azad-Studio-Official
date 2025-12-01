@@ -1,19 +1,24 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TranscriptionResult } from "../types";
 
+// The define in vite.config.ts replaces process.env.API_KEY with the actual string
 const apiKey = process.env.API_KEY || '';
 
 // Initialize only if key exists to prevent immediate errors in environments without keys
 let ai: GoogleGenAI | null = null;
-if (apiKey) {
-  ai = new GoogleGenAI({ apiKey });
+if (apiKey && apiKey.length > 0 && !apiKey.includes("API_KEY")) {
+  try {
+    ai = new GoogleGenAI({ apiKey });
+  } catch (e) {
+    console.error("Failed to initialize Gemini Client", e);
+  }
 }
 
 export const GeminiService = {
   summarizeMessages: async (messages: string[]): Promise<string> => {
     if (!ai) {
       console.warn("Gemini API Key is missing. Mocking response.");
-      return new Promise(resolve => setTimeout(() => resolve("Summary unavailable: API Key missing. Please configure process.env.API_KEY."), 1000));
+      return new Promise(resolve => setTimeout(() => resolve("Summary unavailable: API Key missing. Please configure your Vercel Environment Variables."), 1000));
     }
 
     try {
@@ -110,7 +115,7 @@ export const GeminiService = {
      return {
          original: "This is a placeholder transcription for the video content. The AI analyzes the audio stream to generate text.",
          hindi: "यह वीडियो सामग्री के लिए एक प्लेसहोल्डर प्रतिलेखन है। AI टेक्स्ट उत्पन्न करने के लिए ऑडियो स्ट्रीम का विश्लेषण करता है।",
-         urdu: "یہ ویڈیو مواد کے لیے ایک پلیس ہولڈر ٹرانسکرپشن ہے۔ AI متن بنانے کے لیے آڈیو سٹریم کا تجزیہ کرتا ہے۔",
+         urdu: "یہ ویڈیو مواد کے لیے ایک پلیس ہولڈر ٹرانسکرپشن ہے۔ AI متن بنانے के لیے آڈیو سٹریم کا تجزیہ کرتا ہے۔",
          telugu: "ఇది వీడియో కంటెంట్ కోసం ప్లేస్‌హోల్డర్ ట్రాన్స్‌క్రిప్షన్. వచనాన్ని రూపొందించడానికి AI ఆడియో స్ట్రీమ్‌ను విశ్లేషిస్తుంది."
      };
   },

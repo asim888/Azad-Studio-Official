@@ -14,24 +14,23 @@ const stripHtml = (html: string) => {
 
 // Helper to check if URL is a direct video file
 const isDirectVideo = (url: string) => {
+  if (!url) return false;
   return /\.(mp4|webm|ogg|mov|m4v)$/i.test(url) || url.includes('commondatastorage');
 };
 
 export const ApiService = {
   fetchMessages: async (): Promise<ChannelMessage[]> => {
     // List of public RSS bridges to try in order
-    // Note: In a production app, this should be replaced by your own backend endpoint
     const BRIDGE_URLS = [
         `https://api.rss2json.com/v1/api.json?rss_url=https://tg.i-c-a.su/rss/AzadStudioOfficial`,
         `https://api.rss2json.com/v1/api.json?rss_url=https://rsshub.app/telegram/channel/AzadStudioOfficial`,
-        `https://api.rss2json.com/v1/api.json?rss_url=https://telefeed.me/rss/AzadStudioOfficial`
     ];
 
     for (const url of BRIDGE_URLS) {
         try {
             console.log(`Attempting to fetch from bridge: ${url}`);
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout per bridge
+            const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
             
             const response = await fetch(url, { signal: controller.signal });
             clearTimeout(timeoutId);
@@ -51,38 +50,38 @@ export const ApiService = {
                         // Strict check for playable video formats
                         if (isVideoType && isDirectVideo(item.enclosure.link)) {
                             media = { type: 'video' as const, url: item.enclosure.link };
-                        } else {
-                            // If it claims to be video but isn't a direct link, fallback to thumbnail if available
-                            // or treat as photo if the link is an image
-                            if (item.thumbnail) {
+                        } else if (isVideoType) {
+                             // Fallback for non-playable videos: try to use as photo if thumbnail exists
+                             if (item.thumbnail) {
                                 media = { type: 'photo' as const, url: item.thumbnail };
-                            } else if (!isVideoType) {
-                                media = { type: 'photo' as const, url: item.enclosure.link };
-                            }
+                             }
+                        } else if (item.enclosure.type.includes('image')) {
+                            media = { type: 'photo' as const, url: item.enclosure.link };
                         }
                     } else if (item.thumbnail) {
                         media = { type: 'photo' as const, url: item.thumbnail };
                     }
 
-                    // Generate random reactions for liveliness since RSS doesn't provide them
+                    // Generate random reactions for liveliness
                     const reactionTypes = ['👍', '❤️', '🔥', '🎉', '👏', '😂'];
                     const reactions = [];
-                    if (Math.random() > 0.3) {
-                        const count = Math.floor(Math.random() * 2) + 1;
+                    // Deterministic random based on index to keep consistent across re-renders
+                    if ((index + item.title.length) % 3 !== 0) {
+                        const count = ((index * 7) % 3) + 1;
                         for (let i = 0; i < count; i++) {
-                            const emoji = reactionTypes[Math.floor(Math.random() * reactionTypes.length)];
+                            const emoji = reactionTypes[(index + i) % reactionTypes.length];
                             if (!reactions.find(r => r.emoji === emoji)) {
                                 reactions.push({
                                     emoji,
-                                    count: Math.floor(Math.random() * 50) + 1,
-                                    userReacted: Math.random() > 0.8
+                                    count: ((index * 13 + i * 5) % 100) + 5,
+                                    userReacted: ((index + i) % 5 === 0)
                                 });
                             }
                         }
                     }
 
-                    // Random views for demo
-                    const views = Math.floor(Math.random() * 5000) + 500;
+                    // Random views 
+                    const views = 1000 + (index * 253) % 4000;
 
                     return {
                         id: item.guid || `rss-${index}`,
@@ -97,7 +96,6 @@ export const ApiService = {
             }
         } catch (error) {
             console.warn(`Bridge ${url} failed`, error);
-            // Continue to next bridge
         }
     }
 
@@ -107,18 +105,14 @@ export const ApiService = {
 
   fetchAnalytics: async (type: 'views' | 'subs'): Promise<AnalyticsData[]> => {
     try {
-      // Mock API call
-      // In production: const response = await fetch(`${API_BASE_URL}/analytics/${type}`);
       await delay(600);
       return type === 'views' ? MOCK_ANALYTICS_VIEWS : MOCK_ANALYTICS_SUBS;
-
     } catch (error) {
       return type === 'views' ? MOCK_ANALYTICS_VIEWS : MOCK_ANALYTICS_SUBS;
     }
   },
 
   authenticateUser: async (): Promise<boolean> => {
-    // In a real app, send TelegramService.getInitData() to your backend
     return true; 
   }
 };
