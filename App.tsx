@@ -13,25 +13,44 @@ const App: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
     // Initialize Telegram WebApp
-    TelegramService.ready();
-    TelegramService.expand();
-    
-    // Set Header Color to black for consistency
-    if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.setHeaderColor('#000000');
-        window.Telegram.WebApp.setBackgroundColor('#000000');
+    try {
+      TelegramService.ready();
+      TelegramService.expand();
+      
+      // Set Header Color to black for consistency
+      if (window.Telegram?.WebApp) {
+          window.Telegram.WebApp.setHeaderColor('#000000');
+          window.Telegram.WebApp.setBackgroundColor('#000000');
+      }
+    } catch (e) {
+      console.warn("Telegram WebApp not available (running in browser mode)");
     }
 
     // Authenticate with backend
     const initAuth = async () => {
-      const auth = await ApiService.authenticateUser();
-      setIsAuthenticated(auth);
-      // Add a slight artificial delay for a smoother loading transition effect
-      setTimeout(() => setIsReady(true), 500);
+      try {
+        const auth = await ApiService.authenticateUser();
+        if (mounted) {
+            setIsAuthenticated(auth);
+            // Add a slight artificial delay for a smoother loading transition effect
+            setTimeout(() => {
+                if (mounted) setIsReady(true);
+            }, 500);
+        }
+      } catch (error) {
+          console.error("Auth failed", error);
+          if (mounted) setIsReady(true); // Allow app to render error state
+      }
     };
 
     initAuth();
+
+    return () => {
+        mounted = false;
+    };
   }, []);
 
   const renderContent = () => {
