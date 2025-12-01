@@ -39,8 +39,6 @@ export interface TelegramWebApp {
     hide: () => void;
     enable: () => void;
     disable: () => void;
-    onClick: (callback: () => void) => void;
-    offClick: (callback: () => void) => void;
     showProgress: (leaveActive: boolean) => void;
     hideProgress: () => void;
     setParams: (params: { text?: string; color?: string; text_color?: string; is_active?: boolean; is_visible?: boolean }) => void;
