@@ -1,0 +1,7 @@
+{
+  "name": "AzadStudio Official",
+  "description": "Telegram Mini App for AzadStudioOfficial channel updates, analytics, and user dashboard.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
