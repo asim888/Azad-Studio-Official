@@ -1,6 +1,60 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TelegramService } from '../services/telegram';
-import { Shield, Settings, CreditCard, LogOut, User as UserIcon, CheckCircle2 } from 'lucide-react';
+import { ApiService } from '../services/api';
+import { Shield, Settings, CreditCard, LogOut, User as UserIcon, CheckCircle2, Link as LinkIcon, Loader2 } from 'lucide-react';
+
+function MainAppConnection() {
+  const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleConnect = async () => {
+    setLoading(true);
+    TelegramService.haptic.impact('light');
+    try {
+      const result = await ApiService.connectToMainApp();
+      if (result?.success) {
+        setConnected(true);
+        TelegramService.haptic.success();
+      }
+    } catch (error) {
+      TelegramService.haptic.error();
+      alert('❌ Connection failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-neutral-900 border border-amber-500/30 rounded-xl p-4 mb-6 shadow-lg shadow-amber-900/10">
+      <div className="flex items-center gap-2 mb-3">
+         <LinkIcon size={18} className="text-amber-500" />
+         <h3 className="text-amber-500 font-bold text-sm uppercase tracking-wider">Main App Connection</h3>
+      </div>
+      
+      {connected ? (
+        <div className="flex items-center gap-2 text-emerald-400 bg-emerald-950/30 p-3 rounded-lg border border-emerald-500/20">
+          <CheckCircle2 size={18} />
+          <span className="text-sm font-medium">Connected to main application</span>
+        </div>
+      ) : (
+        <button
+          onClick={handleConnect}
+          disabled={loading}
+          className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-70 disabled:active:scale-100"
+        >
+          {loading ? (
+             <>
+               <Loader2 size={18} className="animate-spin" />
+               <span>Connecting...</span>
+             </>
+          ) : (
+             'Connect to Main App'
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
 
 const Profile: React.FC = () => {
   const user = TelegramService.getUser();
@@ -39,6 +93,9 @@ const Profile: React.FC = () => {
       </div>
 
       <div className="space-y-4">
+        {/* Main App Connection Component */}
+        <MainAppConnection />
+
         <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest ml-2 mb-2">Account Settings</h3>
         
         <div className="bg-neutral-900 rounded-xl overflow-hidden shadow-sm border border-neutral-800">

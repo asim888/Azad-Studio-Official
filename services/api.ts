@@ -114,5 +114,10 @@ export const ApiService = {
 
   authenticateUser: async (): Promise<boolean> => {
     return true; 
+  },
+
+  connectToMainApp: async (): Promise<{ success: boolean }> => {
+    await delay(1500);
+    return { success: true };
   }
 };
