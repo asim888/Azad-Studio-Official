@@ -71,65 +71,221 @@ interface MainAppConnection {
   lastSync?: string;
 }
 
-// ========== MAIN APP INTEGRATION FUNCTIONS ==========
-async function connectToMainApp(telegramUser: TelegramUser): Promise<MainAppConnection> {
+// ========== SUPABASE SPECIFIC FUNCTIONS ==========
+
+// Your Supabase configuration - CHANGE THESE VALUES!
+const SUPABASE_CONFIG = {
+  URL: 'https://your-project-ref.supabase.co',  // ← Your actual Supabase URL
+  ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'  // ← Your actual anon key
+};
+
+// 1. Main function to connect Telegram user to Supabase
+async function connectToSupabase(telegramUser: TelegramUser): Promise<MainAppConnection> {
   try {
-    const response = await fetch(`${MAIN_APP_CONFIG.API_URL}${MAIN_APP_CONFIG.ENDPOINTS.AUTH}`, {
+    console.log('Connecting to Supabase for user:', telegramUser.id);
+    
+    // Prepare user data for Supabase
+    const userData = {
+      telegram_id: telegramUser.id,
+      username: telegramUser.username || '',
+      first_name: telegramUser.first_name || '',
+      last_name: telegramUser.last_name || '',
+      language_code: telegramUser.language_code || 'en',
+      is_premium: telegramUser.is_premium || false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    // Method A: Use Supabase REST API directly (simplest)
+    const response = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/telegram_users`, {
       method: 'POST',
       headers: {
+        'apikey': SUPABASE_CONFIG.ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${MAIN_APP_CONFIG.API_KEY}`,
-        'Telegram-Init-Data': window.Telegram?.WebApp?.initData || ''
+        'Prefer': 'return=representation,resolution=merge-duplicates'
       },
-      body: JSON.stringify({
-        telegramId: telegramUser.id,
-        username: telegramUser.username,
-        firstName: telegramUser.first_name,
-        lastName: telegramUser.last_name,
-        languageCode: telegramUser.language_code,
-        isPremium: telegramUser.is_premium || false
-      })
+      body: JSON.stringify(userData)
     });
-
-    const data = await response.json();
     
-    if (data.success) {
-      localStorage.setItem('mainAppToken', data.token);
-      localStorage.setItem('mainAppUserId', data.user.id);
-      localStorage.setItem('lastConnection', new Date().toISOString());
-      
-      return {
-        connected: true,
-        token: data.token,
-        userId: data.user.id,
-        lastSync: new Date().toISOString()
-      };
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Supabase error: ${response.status} - ${error}`);
     }
     
-    return { connected: false };
+    const savedUser = await response.json();
+    console.log('User saved to Supabase:', savedUser);
+    
+    // Generate a simple session token
+    const sessionToken = `sb_${telegramUser.id}_${Date.now()}`;
+    
+    // Store in localStorage
+    localStorage.setItem('supabase_connection', JSON.stringify({
+      token: sessionToken,
+      telegram_id: telegramUser.id,
+      supabase_id: savedUser[0]?.id,
+      connected_at: new Date().toISOString()
+    }));
+    
+    return {
+      connected: true,
+      token: sessionToken,
+      userId: telegramUser.id.toString(),
+      lastSync: new Date().toISOString()
+    };
+    
   } catch (error) {
-    console.error('Connection failed:', error);
+    console.error('❌ Supabase connection failed:', error);
     return { connected: false };
   }
 }
 
-async function syncWithMainApp(data: any, token: string) {
+// 2. Function to sync data to Supabase
+async function syncDataToSupabase(data: any, telegramId: number) {
   try {
-    const response = await fetch(`${MAIN_APP_CONFIG.API_URL}${MAIN_APP_CONFIG.ENDPOINTS.SYNC}`, {
+    console.log('Syncing data to Supabase for user:', telegramId);
+    
+    const syncData = {
+      telegram_id: telegramId,
+      action_type: 'mini_app_sync',
+      action_data: data,
+      created_at: new Date().toISOString()
+    };
+    
+    // Save to Supabase activity table
+    const response = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/user_activity`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'apikey': SUPABASE_CONFIG.ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(syncData)
     });
     
-    return await response.json();
+    if (!response.ok) {
+      throw new Error(`Sync failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('✅ Data synced to Supabase:', result);
+    
+    return {
+      success: true,
+      data: result,
+      syncedAt: new Date().toISOString()
+    };
+    
   } catch (error) {
-    console.error('Sync failed:', error);
+    console.error('❌ Sync failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// 3. Function to save channel messages to Supabase
+async function saveMessagesToSupabase(messages: ChannelMessage[], telegramId: number) {
+  try {
+    const formattedMessages = messages.map(msg => ({
+      telegram_message_id: msg.id,
+      message_text: msg.text,
+      message_type: msg.type,
+      views: msg.views,
+      engagement_score: msg.engagement,
+      created_at: msg.date,
+      updated_at: new Date().toISOString()
+    }));
+    
+    const response = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/channel_messages`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(formattedMessages)
+    });
+    
+    if (response.ok) {
+      console.log('✅ Messages saved to Supabase');
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Failed to save messages:', error);
+    return false;
+  }
+}
+
+// 4. Function to get user from Supabase
+async function getSupabaseUser(telegramId: number) {
+  try {
+    const response = await fetch(
+      `${SUPABASE_CONFIG.URL}/rest/v1/telegram_users?telegram_id=eq.${telegramId}&select=*`,
+      {
+        headers: {
+          'apikey': SUPABASE_CONFIG.ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+        }
+      }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data[0] || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch user:', error);
     return null;
   }
 }
+
+// 5. Function to get analytics from Supabase
+async function getAnalyticsFromSupabase(telegramId: number) {
+  try {
+    const response = await fetch(
+      `${SUPABASE_CONFIG.URL}/rest/v1/analytics_data?telegram_user_id=eq.${telegramId}&order=recorded_at.desc&limit=10`,
+      {
+        headers: {
+          'apikey': SUPABASE_CONFIG.ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+        }
+      }
+    );
+    
+    if (response.ok) {
+      return await response.json();
+    }
+    return [];
+  } catch (error) {
+    console.error('Failed to fetch analytics:', error);
+    return [];
+  }
+}
+
+// 6. Helper function for Supabase requests
+async function supabaseRequest(endpoint: string, options: RequestInit = {}) {
+  const url = `${SUPABASE_CONFIG.URL}${endpoint}`;
+  
+  const headers = {
+    'apikey': SUPABASE_CONFIG.ANON_KEY,
+    'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+  
+  const response = await fetch(url, { ...options, headers });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Supabase API error: ${response.status} - ${error}`);
+  }
+  
+  return response.json();
+}
+
+// ========== END SUPABASE FUNCTIONS ==========
 
 // ========== REACT COMPONENTS ==========
 function ConnectionStatus({ connected, lastSync }: { connected: boolean; lastSync?: string }) {
