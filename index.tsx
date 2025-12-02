@@ -1,3 +1,26 @@
+import {
+  MessageSquare,
+  BarChart3,
+  Users,
+  Zap,
+  Globe,
+  Bell,
+  Settings,
+  ArrowUpDown,
+  TrendingUp,
+  Clock,
+  Shield,
+  Link as LinkIcon,
+  Database,
+  Bot,
+  Smartphone,
+  Cloud,
+  Activity,
+  Target,
+  Rocket,
+  Sparkles,
+  RefreshCw  // ← ADD THIS LINE (with comma after Sparkles)
+} from 'lucide-react';
 function AzadStudioApp() {
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null);
   const [supabaseConnection, setSupabaseConnection] = useState<MainAppConnection>({ 
