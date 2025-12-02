@@ -1,3 +1,5 @@
+import React, { useEffect, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import {
   MessageSquare,
   BarChart3,
@@ -19,8 +21,300 @@ import {
   Target,
   Rocket,
   Sparkles,
-  RefreshCw  // ← ADD THIS LINE (with comma after Sparkles)
+  RefreshCw
 } from 'lucide-react';
+
+// ========== SUPABASE CONFIGURATION ==========
+// ⚠️ REPLACE THESE TWO VALUES WITH YOUR ACTUAL SUPABASE CREDENTIALS!
+const SUPABASE_CONFIG = {
+  URL: 'https://gsdaowhwfgzzlshontiu.supabase.co',      // ← YOUR SUPABASE URL HERE
+  ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdzZGFvd2h3Zmd6emxzaG9udGl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3MTI4NDYsImV4cCI6MjA3OTI4ODg0Nn0.bURHyqagM4kuLjbSUvpH9H1hk-WUJ2JWmltLFmLxbMs' // ← YOUR ANON KEY HERE
+};
+// ========== END SUPABASE CONFIG ==========
+
+// ========== TYPES ==========
+interface TelegramUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
+  is_premium?: boolean;
+}
+
+interface ChannelMessage {
+  id: number;
+  text: string;
+  date: string;
+  views: number;
+  engagement: number;
+  type: 'text' | 'media' | 'poll';
+}
+
+interface AnalyticsData {
+  subscribers: number;
+  growth: number;
+  engagement: number;
+  topPosts: Array<{ id: number; title: string; views: number }>;
+  activeHours: string[];
+}
+
+interface MainAppConnection {
+  connected: boolean;
+  token?: string;
+  userId?: string;
+  lastSync?: string;
+}
+
+// ========== SUPABASE FUNCTIONS ==========
+async function connectToSupabase(telegramUser: TelegramUser): Promise<MainAppConnection> {
+  try {
+    console.log('Connecting to Supabase for user:', telegramUser.id);
+    
+    const userData = {
+      telegram_id: telegramUser.id,
+      username: telegramUser.username || '',
+      first_name: telegramUser.first_name || '',
+      last_name: telegramUser.last_name || '',
+      language_code: telegramUser.language_code || 'en',
+      is_premium: telegramUser.is_premium || false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    const response = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/telegram_users`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation,resolution=merge-duplicates'
+      },
+      body: JSON.stringify(userData)
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Supabase error: ${response.status} - ${error}`);
+    }
+    
+    const savedUser = await response.json();
+    console.log('User saved to Supabase:', savedUser);
+    
+    const sessionToken = `sb_${telegramUser.id}_${Date.now()}`;
+    
+    localStorage.setItem('supabase_connection', JSON.stringify({
+      token: sessionToken,
+      telegram_id: telegramUser.id,
+      supabase_id: savedUser[0]?.id,
+      connected_at: new Date().toISOString()
+    }));
+    
+    return {
+      connected: true,
+      token: sessionToken,
+      userId: telegramUser.id.toString(),
+      lastSync: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('❌ Supabase connection failed:', error);
+    return { connected: false };
+  }
+}
+
+async function syncDataToSupabase(data: any, telegramId: number) {
+  try {
+    const syncData = {
+      telegram_id: telegramId,
+      action_type: 'mini_app_sync',
+      action_data: data,
+      created_at: new Date().toISOString()
+    };
+    
+    const response = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/user_activity`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(syncData)
+    });
+    
+    if (!response.ok) throw new Error(`Sync failed: ${response.status}`);
+    
+    const result = await response.json();
+    console.log('✅ Data synced to Supabase:', result);
+    
+    return {
+      success: true,
+      data: result,
+      syncedAt: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('❌ Sync failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+async function saveMessagesToSupabase(messages: ChannelMessage[], telegramId: number) {
+  try {
+    const formattedMessages = messages.map(msg => ({
+      telegram_message_id: msg.id,
+      message_text: msg.text,
+      message_type: msg.type,
+      views: msg.views,
+      engagement_score: msg.engagement,
+      created_at: msg.date,
+      updated_at: new Date().toISOString()
+    }));
+    
+    const response = await fetch(`${SUPABASE_CONFIG.URL}/rest/v1/channel_messages`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(formattedMessages)
+    });
+    
+    if (response.ok) {
+      console.log('✅ Messages saved to Supabase');
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Failed to save messages:', error);
+    return false;
+  }
+}
+
+async function getSupabaseUser(telegramId: number) {
+  try {
+    const response = await fetch(
+      `${SUPABASE_CONFIG.URL}/rest/v1/telegram_users?telegram_id=eq.${telegramId}&select=*`,
+      {
+        headers: {
+          'apikey': SUPABASE_CONFIG.ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+        }
+      }
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      return data[0] || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch user:', error);
+    return null;
+  }
+}
+
+// ========== HELPER COMPONENTS ==========
+function ConnectionStatus({ connected, lastSync }: { connected: boolean; lastSync?: string }) {
+  return (
+    <div className={`p-3 rounded-lg mb-4 ${connected ? 'bg-green-900/20 border border-green-700' : 'bg-red-900/20 border border-red-700'}`}>
+      <div className="flex items-center gap-2">
+        <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+        <span className="font-medium">{connected ? 'Connected to Main App' : 'Disconnected from Main App'}</span>
+      </div>
+      {connected && lastSync && (
+        <p className="text-sm text-gray-400 mt-1">Last sync: {new Date(lastSync).toLocaleTimeString()}</p>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon: Icon, change, color = 'amber' }: any) {
+  return (
+    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4 hover:border-amber-500/30 transition-all">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`p-2 rounded-lg bg-${color}-500/10`}>
+          <Icon className={`w-5 h-5 text-${color}-400`} />
+        </div>
+        {change && (
+          <span className={`text-xs px-2 py-1 rounded-full ${change > 0 ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+            {change > 0 ? '+' : ''}{change}%
+          </span>
+        )}
+      </div>
+      <h3 className="text-2xl font-bold text-white mb-1">{value}</h3>
+      <p className="text-gray-400 text-sm">{title}</p>
+    </div>
+  );
+}
+
+function MessageCard({ message }: { message: ChannelMessage }) {
+  return (
+    <div className="bg-gray-900/30 border border-gray-800 rounded-lg p-4 hover:border-amber-500/20 transition-all">
+      <div className="flex items-start gap-3">
+        <div className="p-2 bg-amber-500/10 rounded-lg">
+          <MessageSquare className="w-4 h-4 text-amber-400" />
+        </div>
+        <div className="flex-1">
+          <p className="text-white mb-2 line-clamp-2">{message.text}</p>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">
+              <Clock className="w-3 h-3 inline mr-1" />
+              {new Date(message.date).toLocaleDateString()}
+            </span>
+            <div className="flex items-center gap-4">
+              <span className="text-gray-400">
+                👁️ {message.views.toLocaleString()}
+              </span>
+              <span className="text-amber-400">
+                ⚡ {message.engagement}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionButton({ 
+  onClick, 
+  text, 
+  icon: Icon, 
+  variant = 'primary',
+  loading = false 
+}: { 
+  onClick: () => void;
+  text: string;
+  icon: any;
+  variant?: 'primary' | 'secondary' | 'danger';
+  loading?: boolean;
+}) {
+  const variants = {
+    primary: 'bg-amber-500 hover:bg-amber-600 text-black',
+    secondary: 'bg-gray-800 hover:bg-gray-700 text-white',
+    danger: 'bg-red-500 hover:bg-red-600 text-white'
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className={`flex items-center justify-center gap-2 font-medium py-3 px-4 rounded-lg transition-all ${variants[variant]} ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+    >
+      {loading ? (
+        <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+      ) : (
+        <Icon className="w-5 h-5" />
+      )}
+      {text}
+    </button>
+  );
+}
+
+// ========== MAIN APP COMPONENT ==========
 function AzadStudioApp() {
   const [telegramUser, setTelegramUser] = useState<TelegramUser | null>(null);
   const [supabaseConnection, setSupabaseConnection] = useState<MainAppConnection>({ 
@@ -738,5 +1032,15 @@ function AzadStudioApp() {
   );
 }
 
-// Add RefreshCw icon import at the top with other imports
-import { RefreshCw } from 'lucide-react';
+// ========== RENDER APPLICATION ==========
+const container = document.getElementById('root');
+if (container) {
+  const root = createRoot(container);
+  root.render(
+    <React.StrictMode>
+      <AzadStudioApp />
+    </React.StrictMode>
+  );
+} else {
+  console.error('Root element not found');
+}
