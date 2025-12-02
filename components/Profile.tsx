@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TelegramService } from '../services/telegram';
 import { ApiService } from '../services/api';
-import { Shield, Settings, CreditCard, LogOut, User as UserIcon, CheckCircle2, Link as LinkIcon, Loader2 } from 'lucide-react';
+import { Shield, Settings, CreditCard, LogOut, User as UserIcon, CheckCircle2, Link as LinkIcon, Loader2, Globe } from 'lucide-react';
 
 function MainAppConnection() {
   const [connected, setConnected] = useState(false);
@@ -27,14 +27,14 @@ function MainAppConnection() {
   return (
     <div className="bg-neutral-900 border border-amber-500/30 rounded-xl p-4 mb-6 shadow-lg shadow-amber-900/10">
       <div className="flex items-center gap-2 mb-3">
-         <LinkIcon size={18} className="text-amber-500" />
-         <h3 className="text-amber-500 font-bold text-sm uppercase tracking-wider">Main App Connection</h3>
+         <Globe size={18} className="text-amber-500" />
+         <h3 className="text-amber-500 font-bold text-sm uppercase tracking-wider">NewsPulseAI Integration</h3>
       </div>
       
       {connected ? (
         <div className="flex items-center gap-2 text-emerald-400 bg-emerald-950/30 p-3 rounded-lg border border-emerald-500/20">
           <CheckCircle2 size={18} />
-          <span className="text-sm font-medium">Connected to main application</span>
+          <span className="text-sm font-medium">Connected to NewsPulseAI.org</span>
         </div>
       ) : (
         <button
@@ -48,7 +48,7 @@ function MainAppConnection() {
                <span>Connecting...</span>
              </>
           ) : (
-             'Connect to Main App'
+             'Connect to NewsPulseAI'
           )}
         </button>
       )}

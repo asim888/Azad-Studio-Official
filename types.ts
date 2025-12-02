@@ -5,6 +5,7 @@ export interface User {
   username?: string;
   language_code?: string;
   photo_url?: string;
+  is_premium?: boolean;
 }
 
 export interface TelegramWebApp {

@@ -29,10 +29,16 @@ const App: React.FC = () => {
       console.warn("Telegram WebApp not available (running in browser mode)");
     }
 
-    // Authenticate with backend
+    // Authenticate with backend and auto-connect to Main App
     const initAuth = async () => {
       try {
         const auth = await ApiService.authenticateUser();
+        
+        // Attempt background connection to main app
+        ApiService.connectToMainApp().then(res => {
+            if(res.success) console.log("Background connection to main app successful");
+        });
+
         if (mounted) {
             setIsAuthenticated(auth);
             // Add a slight artificial delay for a smoother loading transition effect
